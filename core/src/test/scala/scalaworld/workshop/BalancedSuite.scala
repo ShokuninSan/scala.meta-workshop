@@ -2,25 +2,33 @@ package scalaworld.workshop
 
 import scala.meta._
 // These may come in handy.
-import scala.meta.tokens.Token.LeftBrace
-import scala.meta.tokens.Token.LeftBracket
-import scala.meta.tokens.Token.LeftParen
-import scala.meta.tokens.Token.RightBrace
-import scala.meta.tokens.Token.RightBracket
-import scala.meta.tokens.Token.RightParen
+import scala.meta.tokens.Token.{LeftBrace, LeftBracket, LeftParen, RightBrace, RightBracket, RightParen}
 
 class BalancedSuite extends WorkshopSuite {
   override def run(str: String): Boolean = isBalanced(str.tokenize.get)
 
-  /** Are parentheses balanced? */
-  def isBalanced(tokens: Tokens): Boolean = {
-    var balance = 0
+  // see https://geirsson.com/post/2016/02/scalameta/#find-correct-matching-parentheses
+  def matching(tokens: Seq[Token]): Map[Token, Token] = {
+    val result = scala.collection.mutable.Map.empty[Token, Token]
+    var stack = List.empty[Token]
     tokens.foreach {
-      case LeftBrace() => balance += 1
-      case RightBrace() => balance -= 1
+      case open@( _: LeftBrace | _: LeftBracket | _: LeftParen) => stack = open :: stack
+      case close@( _: RightBrace | _: RightBracket | _: RightParen) =>
+        stack.headOption.map((_, close)) foreach {
+          case t@((_:LeftBrace, _:RightBrace) | (_:LeftBracket, _:RightBracket) | (_:LeftParen, _:RightParen)) =>
+            result += t._1 -> t._2
+            stack = stack.tail
+          case _ => return Map.empty
+        }
       case _ =>
     }
-    balance == 0
+    result.toMap
+  }
+
+  /** Are parentheses balanced? */
+  def isBalanced(tokens: Tokens): Boolean = {
+    val t = tokens.filter(t => t.isInstanceOf[LeftParen] || t.isInstanceOf[RightParen] || t.isInstanceOf[LeftBracket] || t.isInstanceOf[RightBracket] || t.isInstanceOf[LeftBrace] || t.isInstanceOf[RightBrace])
+    matching(t).nonEmpty && (t.length % 2 == 0)
   }
 
   checkNot("{")
